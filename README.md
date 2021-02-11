@@ -1,5 +1,5 @@
-# React - Next.js, ChakraUI
-# Mikro-ORM -> Postgresql
-# Redis
-# Typescript
-# Graphql -> UrlQL
+### React - Next.js, ChakraUI
+### Mikro-ORM -> Postgresql
+### Redis
+### Typescript
+### Graphql -> UrlQL
