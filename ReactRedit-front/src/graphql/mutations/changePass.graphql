@@ -1,0 +1,11 @@
+mutation ChangePass($token: String!, $newPassword: String!) {
+  changePassword(token: $token, newPassword: $newPassword) {
+    user {
+      ...User
+    }
+    errors {
+      field
+      message
+    }
+  }
+}
