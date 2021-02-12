@@ -14,35 +14,38 @@ export const Navbar: React.FC<NavbarProps> = ({}) => {
   let body = null;
   if (!data?.me?.user) {
     body = (
-      <Flex bg="tomato" p={4}>
-        <Box ml="auto">
-          <NextLink href="/login">
-            <Link mr={9}>Login</Link>
-          </NextLink>
-          <NextLink href="/register">
-            <Link mr={5}>Register</Link>
-          </NextLink>
-        </Box>
-      </Flex>
+      <Box ml="auto">
+        <NextLink href="/login">
+          <Link mr={9}>Login</Link>
+        </NextLink>
+        <NextLink href="/register">
+          <Link mr={5}>Register</Link>
+        </NextLink>
+      </Box>
     );
   } else {
     body = (
-      <Flex bg="tomato" p={4}>
-        <Flex ml="auto">
-          <Box mr={3}>{data.me.user?.username}</Box>
-          <Button
-            onClick={() => {
-              logout();
-            }}
-            variant="link"
-            color="black"
-            isLoading={fetching}
-          >
-            Logout
-          </Button>
-        </Flex>
+      <Flex ml="auto">
+        <Box mr={3}>Welcome {data.me.user?.username}</Box>
+        <NextLink href="/create-post">
+          <Link mr={2}>Create Post</Link>
+        </NextLink>
+        <Button
+          onClick={() => {
+            logout();
+          }}
+          variant="link"
+          color="black"
+          isLoading={fetching}
+        >
+          Logout
+        </Button>
       </Flex>
     );
   }
-  return body;
+  return (
+    <Flex bg="tomato" zIndex={2} position="sticky" top={0} p={4}>
+      {body}
+    </Flex>
+  );
 };

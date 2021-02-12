@@ -1,6 +1,6 @@
 import React from "react";
 import { Formik, Form } from "formik";
-import { Box, Button } from "@chakra-ui/react";
+import { Box, Button, Flex, Link } from "@chakra-ui/react";
 import { Wrapper } from "../components/Wrapper";
 import { InputField } from "../components/InputField";
 import { useLoginMutation } from "../generated/graphql";
@@ -8,6 +8,7 @@ import { toErrorMap } from "../utils/toErrorMap";
 import { useRouter } from "next/router";
 import { withUrqlClient } from "next-urql";
 import { createUrqlClient } from "../utils/createUrqlClient";
+import NextLink from "next/link";
 interface registerProps {}
 
 export const login: React.FC<registerProps> = ({}) => {
@@ -23,7 +24,11 @@ export const login: React.FC<registerProps> = ({}) => {
           if (res.data?.login.errors) {
             setErrors(toErrorMap(res.data.login.errors));
           } else if (res.data?.login.user) {
-            router.push("/");
+            if (typeof router.query.next === "string") {
+              router.push(router.query.next);
+            } else {
+              router.push("/");
+            }
           }
         }}
       >
@@ -42,14 +47,20 @@ export const login: React.FC<registerProps> = ({}) => {
                 type="password"
               />
             </Box>
-            <Button
-              isLoading={isSubmitting}
-              mt={4}
-              colorScheme="teal"
-              type="submit"
-            >
-              Register
-            </Button>
+            <Flex mt={2}>
+              <Button
+                ml="auto"
+                isLoading={isSubmitting}
+                colorScheme="teal"
+                type="submit"
+                mt={5}
+              >
+                Login
+              </Button>
+              <NextLink href="/forgot-password">
+                <Link ml="auto">forgot password</Link>
+              </NextLink>
+            </Flex>
           </Form>
         )}
       </Formik>

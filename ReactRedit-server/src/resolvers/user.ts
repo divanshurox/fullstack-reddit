@@ -15,6 +15,7 @@ import { validateRegister } from "../utils/validateRegister";
 import { sendMail } from "../utils/sendEmail";
 import { v4 } from "uuid";
 import { FORGET_PASS_PREFIX } from "../constants";
+import { getConnection } from "typeorm";
 
 @ObjectType()
 class FieldError {
@@ -39,9 +40,9 @@ export class UserResolver {
   @Mutation(() => Boolean)
   async forgotPassword(
     @Arg("email") email: string,
-    @Ctx() { em, redis }: MyContext
+    @Ctx() { redis }: MyContext
   ) {
-    const user = await em.findOne(User, { email });
+    const user = await User.findOne({ where: { email } });
     if (!user) {
       return true;
     }
@@ -63,7 +64,7 @@ export class UserResolver {
   async changePassword(
     @Arg("newPassword") newPassword: string,
     @Arg("token") token: string,
-    @Ctx() { em, redis, req }: MyContext
+    @Ctx() { redis, req }: MyContext
   ): Promise<UserResponse> {
     if (newPassword.length <= 2) {
       return {
@@ -86,7 +87,8 @@ export class UserResolver {
         ],
       };
     }
-    const user = await em.findOne(User, { id: parseInt(userId) });
+    const userIdNum = parseInt(userId);
+    const user = await User.findOne({ where: { id: userIdNum } });
     if (!user) {
       return {
         errors: [
@@ -99,9 +101,9 @@ export class UserResolver {
     }
     const newHashedPass = await hash(newPassword);
     if (typeof newPassword !== "undefined") {
-      user.password = newHashedPass;
-      await em.persistAndFlush(user);
+      await User.update({ id: userIdNum }, { password: newHashedPass });
     }
+    await redis.del(FORGET_PASS_PREFIX + token);
     req.session.userId = user.id;
     return {
       user,
@@ -109,7 +111,7 @@ export class UserResolver {
   }
 
   @Query(() => UserResponse)
-  async me(@Ctx() { em, req }: MyContext): Promise<UserResponse> {
+  async me(@Ctx() { req }: MyContext): Promise<UserResponse> {
     const userId = req.session.userId;
     if (!userId) {
       return {
@@ -121,27 +123,36 @@ export class UserResolver {
         ],
       };
     }
-    const user = await em.findOne(User, { id: userId });
+    const user = await User.findOne({ where: { id: userId } });
     return { user };
   }
 
   @Mutation(() => UserResponse)
   async register(
     @Arg("options") options: UsernamePasswordInput,
-    @Ctx() { em, req }: MyContext
+    @Ctx() { req }: MyContext
   ): Promise<UserResponse> {
     const errors = validateRegister(options);
     if (errors) {
       return { errors };
     }
     const hashedPassword = await hash(options.password);
-    const user = em.create(User, {
-      username: options.username,
-      password: hashedPassword,
-      email: options.email,
-    });
+    let user;
     try {
-      await em.persistAndFlush(user);
+      const result = await getConnection()
+        .createQueryBuilder()
+        .insert()
+        .into(User)
+        .values([
+          {
+            username: options.username,
+            password: hashedPassword,
+            email: options.email,
+          },
+        ])
+        .returning("*")
+        .execute();
+      user = result.raw[0];
     } catch (err) {
       console.log(err);
       if (err.code === "23505") {
@@ -166,14 +177,13 @@ export class UserResolver {
   async login(
     @Arg("usernameOrEmail") usernameOrEmail: string,
     @Arg("password") password: string,
-    @Ctx() { em, req }: MyContext
+    @Ctx() { req }: MyContext
   ): Promise<UserResponse> {
-    const user = await em.findOne(
-      User,
-      usernameOrEmail.includes("@")
+    const user = await User.findOne({
+      where: usernameOrEmail.includes("@")
         ? { email: usernameOrEmail }
-        : { username: usernameOrEmail }
-    );
+        : { username: usernameOrEmail },
+    });
     if (!user) {
       return {
         errors: [
