@@ -1,0 +1,13 @@
+fragment PostFrag on Post {
+  id
+  title
+  textSnippet
+  createdAt
+  points
+  isUpVoted
+  author {
+    id
+    username
+    email
+  }
+}

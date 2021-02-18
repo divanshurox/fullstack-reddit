@@ -7,6 +7,8 @@ import {
   Mutation,
   Field,
   ObjectType,
+  FieldResolver,
+  Root,
 } from "type-graphql";
 import { MyContext } from "../types";
 import { hash, verify } from "argon2";
@@ -16,6 +18,7 @@ import { sendMail } from "../utils/sendEmail";
 import { v4 } from "uuid";
 import { FORGET_PASS_PREFIX } from "../constants";
 import { getConnection } from "typeorm";
+import { userInfo } from "os";
 
 @ObjectType()
 class FieldError {
@@ -35,8 +38,16 @@ class UserResponse {
   user?: User | null;
 }
 
-@Resolver()
+@Resolver(User)
 export class UserResolver {
+  @FieldResolver()
+  email(@Root() user: User, @Ctx() { req }: MyContext) {
+    if (req.session.userId === user.id) {
+      return user.email;
+    }
+    return "";
+  }
+
   @Mutation(() => Boolean)
   async forgotPassword(
     @Arg("email") email: string,
@@ -166,11 +177,7 @@ export class UserResolver {
         };
       }
     }
-    try {
-      req.session.userId = user.id;
-    } catch (err) {
-      console.log(err);
-    }
+    req.session.userId = user.id;
     return { user };
   }
   @Mutation(() => UserResponse)

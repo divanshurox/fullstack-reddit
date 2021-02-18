@@ -14,7 +14,6 @@ const CreatePost: React.FC<CreatePostProps> = ({}) => {
   const [{ data, fetching }] = useMeQuery();
   const router = useRouter();
   useEffect(() => {
-    console.log(data?.me, fetching);
     if (!data?.me.user && !fetching) {
       router.push("/login?next=" + router.pathname);
     }
