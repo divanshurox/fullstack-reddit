@@ -17,14 +17,16 @@ import { Post } from "./entities/Post";
 import { User } from "./entities/User";
 import path from "path";
 import { Updoot } from "./entities/Updoot";
+import { createUserLoader } from "./utils/createUserLoader";
+import { createUpdootLoader } from "./utils/createUpdootLoader";
 
 const main = async () => {
-  const conn = await createConnection({
+  await createConnection({
     type: "postgres",
     database: "lireddit2",
     username: "postgres",
     password: __password__,
-    logging: true,
+    logging: false,
     synchronize: true,
     entities: [Post, User, Updoot],
     migrations: [path.join(__dirname, "./migrations/*")],
@@ -63,7 +65,13 @@ const main = async () => {
       resolvers: [HelloResolver, PostResolver, UserResolver],
       validate: false,
     }),
-    context: ({ req, res }): MyContext => ({ req, res, redis }),
+    context: ({ req, res }): MyContext => ({
+      req,
+      res,
+      redis,
+      userLoader: createUserLoader(),
+      updootLoader: createUpdootLoader(),
+    }),
   });
   apolloServer.applyMiddleware({
     app,

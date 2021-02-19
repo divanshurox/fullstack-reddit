@@ -18,7 +18,6 @@ import { sendMail } from "../utils/sendEmail";
 import { v4 } from "uuid";
 import { FORGET_PASS_PREFIX } from "../constants";
 import { getConnection } from "typeorm";
-import { userInfo } from "os";
 
 @ObjectType()
 class FieldError {

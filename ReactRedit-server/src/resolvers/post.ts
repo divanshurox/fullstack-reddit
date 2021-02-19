@@ -17,6 +17,10 @@ import { MyContext } from "../types";
 import { isAuth } from "../middleware/isAuth";
 import { getConnection } from "typeorm";
 import { Updoot } from "../entities/Updoot";
+import { User } from "../entities/User";
+import { Storage } from "@google-cloud/storage";
+import path from "path";
+import { BUCKET_NAME } from "../constants";
 
 @InputType()
 class PostFields {
@@ -25,6 +29,9 @@ class PostFields {
 
   @Field()
   text!: string;
+
+  @Field()
+  image: string;
 }
 
 @ObjectType()
@@ -36,6 +43,11 @@ class PaginatedOutput {
   hasMore: boolean;
 }
 
+const gc = new Storage({
+  keyFilename: path.join(__dirname, "../round-cacao-305308-bc791e067c5d.json"),
+  projectId: "round-cacao-305308",
+});
+
 @Resolver(Post)
 export class PostResolver {
   @FieldResolver(() => String)
@@ -43,18 +55,23 @@ export class PostResolver {
     return root.text.slice(0, 60);
   }
 
+  @FieldResolver(() => User)
+  author(@Root() root: Post, @Ctx() { userLoader }: MyContext) {
+    return userLoader.load(root.authorId);
+  }
+
   @FieldResolver(() => Int, { nullable: true })
-  async isUpVoted(@Root() root: Post, @Ctx() { req }: MyContext) {
+  async isUpVoted(@Root() root: Post, @Ctx() { req, updootLoader }: MyContext) {
     const { userId } = req.session;
-    if (userId) {
-      const updoot = await Updoot.findOne({
-        where: { authorId: userId, postId: root.id },
-      });
-      if (updoot && typeof updoot !== "undefined") {
-        return updoot.value;
-      }
+    if (!userId) {
+      return null;
     }
-    return null;
+    const updoot = await updootLoader.load({
+      postId: root.id,
+      authorId: userId,
+    });
+    console.log(updoot);
+    return updoot ? updoot.value : null;
   }
 
   @Mutation(() => Boolean)
@@ -115,13 +132,8 @@ export class PostResolver {
     }
     const posts = await getConnection().query(
       `
-        select p.*,
-        json_build_object(
-          'id', u.id,
-          'username', u.username,
-          'email', u.email) author
+        select p.*
         from post p
-        inner join public.user u on u.id = p."authorId"
         ${cursor ? `where p."createdAt" < $2` : ""}
         order by p."createdAt" DESC
         limit $1
@@ -142,7 +154,7 @@ export class PostResolver {
   }
 
   @Query(() => Post, { nullable: true })
-  post(@Arg("id") id: number): Promise<Post | undefined> {
+  post(@Arg("id", () => Int) id: number): Promise<Post | undefined> {
     return Post.findOne(id);
   }
 
@@ -152,27 +164,43 @@ export class PostResolver {
     @Arg("options") options: PostFields,
     @Ctx() { req }: MyContext
   ): Promise<Post | undefined> {
+    try {
+      await gc.bucket(BUCKET_NAME).upload("");
+    } catch (err) {
+      console.log(err);
+    }
     return Post.create({ ...options, authorId: req.session.userId }).save();
   }
 
   @Mutation(() => Post, { nullable: true })
+  @UseMiddleware(isAuth)
   async updatePost(
-    @Arg("id") id: number,
-    @Arg("title", () => String, { nullable: true }) title: string
+    @Arg("id", () => Int) id: number,
+    @Arg("title") title: string,
+    @Arg("text") text: string,
+    @Ctx() { req }: MyContext
   ): Promise<Post | undefined> {
-    const post = await Post.findOne(id);
-    if (!post) {
-      return undefined;
-    }
-    if (typeof title !== "undefined") {
-      await Post.update({ id }, { title });
-    }
-    return post;
+    const post = await getConnection()
+      .createQueryBuilder()
+      .update(Post)
+      .set({ title, text })
+      .where('id = :id and "authorId" = :authorId', {
+        id,
+        authorId: req.session.userId,
+      })
+      .returning("*")
+      .execute();
+    return post.raw[0] as any;
   }
 
   @Mutation(() => Boolean)
-  async deletePost(@Arg("id") id: number): Promise<boolean> {
-    await Post.delete(id);
+  @UseMiddleware(isAuth)
+  async deletePost(
+    @Arg("id", () => Int) id: number,
+    @Ctx() { req }: MyContext
+  ): Promise<boolean> {
+    const { userId } = req.session;
+    await Post.delete({ id, authorId: userId });
     return true;
   }
 }
